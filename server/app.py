@@ -29,19 +29,27 @@ def index():
 
 class RestaurantsResource(Resource):
     def get(self):
+        """Fetch all restaurants without restaurant_pizzas field"""
         restaurants = Restaurant.query.all()
-        return jsonify([restaurant.to_dict() for restaurant in restaurants])
+        return jsonify([{
+            'id': restaurant.id,
+            'name': restaurant.name,
+            'address': restaurant.address
+        } for restaurant in restaurants])
 
 class RestaurantResource(Resource):
     def get(self, id):
+        """Fetch a single restaurant by ID"""
         restaurant = Restaurant.query.get(id)
         if restaurant:
             return jsonify(restaurant.to_dict())
         return make_response(jsonify({"error": "Restaurant not found"}), 404)
 
     def delete(self, id):
+        """Delete a restaurant by ID"""
         restaurant = Restaurant.query.get(id)
         if restaurant:
+            # Delete associated restaurant_pizzas
             for rp in restaurant.restaurant_pizzas:
                 db.session.delete(rp)
             db.session.delete(restaurant)
@@ -51,23 +59,34 @@ class RestaurantResource(Resource):
 
 class PizzasResource(Resource):
     def get(self):
+        """Fetch all pizzas without restaurant_pizzas field"""
         pizzas = Pizza.query.all()
-        return jsonify([pizza.to_dict() for pizza in pizzas])
+        return jsonify([{
+            'id': pizza.id,
+            'name': pizza.name,
+            'ingredients': pizza.ingredients
+        } for pizza in pizzas])
 
 class RestaurantPizzasResource(Resource):
     def post(self):
+        """Create a new restaurant_pizza"""
         data = request.get_json()
+
+        price = data.get("price")
+        if price < 1 or price > 30:
+            return make_response(jsonify({"errors": ["validation errors"]}), 400)
+
         try:
             new_restaurant_pizza = RestaurantPizza(
-                price=data["price"],
+                price=price,
                 pizza_id=data["pizza_id"],
                 restaurant_id=data["restaurant_id"]
             )
             db.session.add(new_restaurant_pizza)
             db.session.commit()
-            return jsonify(new_restaurant_pizza.to_dict())
+            return make_response(jsonify(new_restaurant_pizza.to_dict()), 201)
         except Exception as e:
-            return make_response(jsonify({"errors": [str(e)]}), 400)
+            return make_response(jsonify({"errors": ["validation errors"]}), 400)
 
 api.add_resource(RestaurantsResource, "/restaurants")
 api.add_resource(RestaurantResource, "/restaurants/<int:id>")
